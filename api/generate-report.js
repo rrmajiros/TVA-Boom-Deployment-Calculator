@@ -61,12 +61,12 @@ export default async function handler(req, res) {
             on a geographic response strategy for a diesel fuel spill.
 
             The report should be a single, well-structured paragraph that includes the following information:
-            - A professional salutation.
+            
             - A summary of the deployment conditions (river mile, current, river width, boom angle, drift time if available).
             - The calculated boom length required and the estimated tension.
             - The recommended anchor interval and total number of anchors.
             - A clear recommendation on whether a single boom or a cascade booming system is required, and if so, how many segments.
-            - A professional closing.
+            
 
             Here are the details for the report:
             - River Mile: ${riverMile || 'Not specified'}
@@ -81,8 +81,8 @@ export default async function handler(req, res) {
             - Total segments (if cascade): ${isCascade ? segments : 1}
             - Total anchors required: ${anchors}
             - Anchor details: ${anchorDetailsText}
-            - Spill Type: Diesel Fuel
-            - Location: Tennessee Valley Authority waterway
+            
+            - Location: TVA GRS Strategy for a specific river mile
         `;
 
         const googleAiPayload = {
