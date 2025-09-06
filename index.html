@@ -366,11 +366,10 @@
             
             let segments = 1;
             let anchors = 0;
-            let segmentLength = boomLength;
             let anchorDetailsText = '';
 
+            // This logic is needed to send the correct data to the serverless function.
             if (isCascade) {
-                // Use the same logic as the display function to ensure consistency
                 if (current >= 1 && current < 1.5) {
                     segments = 3;
                 } else if (current >= 1.5 && current < 2) {
@@ -385,10 +384,7 @@
                     segments = Math.ceil(boomLength / riverWidth);
                 }
                 
-                segmentLength = Math.ceil(boomLength / segments / 50) * 50;
-                
-                 // Calculate total anchors based on the full boom length and anchor interval
-                if (interval.includes('per')) {
+                 if (interval.includes('per')) {
                     const anchorsPerInterval = parseFloat(interval.split(' ')[0]);
                     const intermediateAnchors = Math.floor(boomLength / 50);
                     anchors = intermediateAnchors * anchorsPerInterval + 2;
@@ -401,7 +397,6 @@
                     anchors = anchorsPerSegment * segments;
                     anchorDetailsText = `A total of ${anchors} anchors are required. Each segment requires ${anchorsPerSegment} anchors based on the ${intervalValue} ft interval.`;
                 }
-                
             } else {
                 const intervalText = outputInterval.textContent;
                 if (intervalText.includes('per')) {
@@ -415,11 +410,6 @@
                 }
             }
             
-            // Get today's date
-            const today = new Date();
-            const options = { year: 'numeric', month: 'long', day: 'numeric' };
-            const formattedDate = today.toLocaleDateString('en-US', options);
-
             const reportTitle = `Geographic Response Strategy Report for River Mile ${riverMile || 'N/A'}`;
 
             // Show loading state for both generation and saving
@@ -428,337 +418,142 @@
             reportContainer.classList.remove('hidden');
             reportOutput.innerHTML = '<div class="mt-8 text-white text-center">...Thinking...</div>';
             statusMessage.textContent = ''; // Clear any previous status message
-
-            const userQuery = `Write a detailed operational plan for a deployment report using the following format and data:
             
-            Deployment Report
-            Prepared for: TVA Emergency Management
-            Subject: Geographic Response Strategy for River Mile ${riverMile}
-            
-            Operational Plan:
-            
-            Location: River Mile ${riverMile}
-            River Width: ${riverWidth} feet
-            Drift Time: ${driftTime} seconds
-            Current: ${current} knots
-            Max Boom Deflection Angle: ${angle} degrees
-            Boom Required: ${calculatedBoomLength} feet
-            Estimated Tension: ${tension} pounds per 100 ft of boom profile
-            Recommended Anchor Interval: ${interval}
-            
-            ${anchorDetailsText} 
-            
-            ${isCascade ? `The deployment will utilize a cascade booming system with ${segments} segments.` : ''} The deployment will use a 22-pound Danforth anchor. Please ensure all measurements and values in the report are presented in imperial units (e.g., feet, knots, pounds). Do not include any mention of a diagram, sketch, or formal email headings like "Prepared For" or "Subject" in the report text itself.`;
-            
-            const systemPrompt = "You are an expert oil spill response specialist. Your task is to write the body of a detailed, professional, and concise deployment report based on the provided data. The body should describe the operational plan, highlight key safety considerations, and explain the physical principles at play. Do not mention that you are an AI or language model. Respond in a formal, informative tone. Do not use an emoji.";
-            const apiKey = "";
-            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
-
-            // Make the API call with exponential backoff
-            const fetchWithBackoff = async (url, options, retries = 3, delay = 1000) => {
-                try {
-                    const response = await fetch(url, options);
-                    if (!response.ok) {
-                        if (response.status === 429 && retries > 0) {
-                            console.log(`Rate limit exceeded. Retrying in ${delay / 1000} seconds...`);
-                            await new Promise(resolve => setTimeout(resolve, delay));
-                            return fetchWithBackoff(url, options, retries - 1, delay * 2);
-                        }
-                        throw new Error(`HTTP error! status: ${response.status}`);
-                    }
-                    return response;
-                } catch (error) {
-                    if (retries > 0) {
-                        console.log(`Fetch error. Retrying in ${delay / 1000} seconds...`);
-                        await new Promise(resolve => setTimeout(resolve, delay));
-                        return fetchWithBackoff(url, options, retries - 1, delay * 2);
-                    }
-                    throw error;
-                }
-            };
-
             try {
-                // Step 1: Generate the report text
-                const response = await fetchWithBackoff(apiUrl, {
+                // Step 1: Send the data to the serverless function.
+                const response = await fetch('/api/generate-report', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        contents: [{ parts: [{ text: userQuery }] }],
-                        systemInstruction: {
-                            parts: [{ text: systemPrompt }]
-                        },
-                    })
+                        current,
+                        angle,
+                        riverWidth,
+                        riverMile,
+                        calculatedBoomLength,
+                        tension,
+                        interval,
+                        driftTime,
+                        isCascade,
+                        segments,
+                        anchors,
+                        anchorDetailsText
+                    }),
                 });
 
                 const result = await response.json();
-                const generatedText = result?.candidates?.[0]?.content?.parts?.[0]?.text || "Could not generate report. Please try again.";
-                
-                // Add the new title to the generated text
-                reportOutput.innerHTML = `
-                    <div class="font-bold text-lg mb-4 text-white">${reportTitle}</div>
-                    <div class="whitespace-pre-wrap text-sm text-gray-300">${generatedText}</div>
-                `;
 
-                // Step 2: Save the report to Airtable with the specified fields
-                statusMessage.textContent = 'Saving report to Airtable...';
-                const airtableUrl = `https://api.airtable.com/v0/${airtableBaseId}/${airtableTableId}`;
-
-                // Convert all number-like values to a number type to prevent Airtable errors
-                const currentNum = parseFloat(current);
-                const boomLengthNum = parseFloat(calculatedBoomLength);
-                const angleNum = parseFloat(angle);
-                const anchorsNum = parseFloat(anchors);
-                const segmentsNum = parseFloat(segments);
-                const riverWidthNum = parseFloat(riverWidth);
-                const driftTimeStr = driftTime;
-
-                // Correctly parse the interval to be a number for Airtable
-                let intervalValueForAirtable;
-                if (interval.includes('+')) {
-                    intervalValueForAirtable = parseFloat(interval.replace('+', ''));
-                } else if (interval.includes('per')) {
-                    intervalValueForAirtable = parseFloat(interval.split(' ')[0]);
+                if (response.ok) {
+                    const generatedText = result.reportText;
+                    reportOutput.innerHTML = `
+                        <div class="font-bold text-lg mb-4 text-white">${reportTitle}</div>
+                        <div class="whitespace-pre-wrap text-sm text-gray-300">${generatedText}</div>
+                    `;
+                    statusMessage.textContent = 'Report generated and saved successfully!';
+                    generateAndSaveBtn.textContent = 'Generate & Save Report ✨';
                 } else {
-                    intervalValueForAirtable = parseFloat(interval);
+                    statusMessage.textContent = `Error: ${result.message}`;
+                    reportOutput.innerHTML = `<div class="mt-8 text-red-400 text-center">Failed to generate report. Please try again.</div>`;
+                    generateAndSaveBtn.textContent = 'Generate & Save Report ✨';
                 }
-
-                const airtablePayload = {
-                    records: [{
-                        fields: {
-                            'River Mile': riverMile || 'N/A',
-                            'Current': isNaN(currentNum) ? null : currentNum,
-                            'Boom Length': isNaN(boomLengthNum) ? null : boomLengthNum,
-                            'Angle': isNaN(angleNum) ? null : angleNum,
-                            'Anchors': isNaN(anchorsNum) ? null : anchorsNum,
-                            'Segments': isNaN(segmentsNum) ? null : segmentsNum,
-                            'Seg Length': isNaN(segmentLength) ? null : segmentLength,
-                            'Report': generatedText,
-                            'River Width': isNaN(riverWidthNum) ? null : riverWidthNum,
-                            'Drift Time': driftTimeStr,
-                            'Anchor Interval': isNaN(intervalValueForAirtable) ? null : intervalValueForAirtable
-                        }
-                    }]
-                };
-
-                console.log('Sending payload to Airtable:', airtablePayload);
-
-                const airtableResponse = await fetch(airtableUrl, {
-                    method: 'POST',
-                    headers: {
-                        'Authorization': `Bearer ${airtableApiKey}`,
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify(airtablePayload)
-                });
-                
-                if (airtableResponse.ok) {
-                    statusMessage.textContent = 'Report saved successfully to Airtable!';
-                    reportGenerated = true; // Set the flag to true on success
-                } else {
-                    const errorDetails = await airtableResponse.json();
-                    statusMessage.textContent = `Error saving report: ${airtableResponse.statusText}. Please check your Base ID and Table ID.`;
-                    console.error('Airtable save failed:', errorDetails);
-                }
-
             } catch (error) {
-                console.error("API call failed:", error);
-                reportOutput.innerHTML = '<div class="mt-8 text-white text-center">Error generating report. Please check your network connection or try again later.</div>';
-                statusMessage.textContent = "Error saving report.";
+                console.error('Error during report generation:', error);
+                statusMessage.textContent = 'An unexpected error occurred. Check the console for details.';
+                reportOutput.innerHTML = `<div class="mt-8 text-red-400 text-center">Failed to generate report. Please try again.</div>`;
             } finally {
-                // Update button state based on the new flag
-                updateButtonState();
+                generateAndSaveBtn.disabled = false;
             }
         };
 
-        // Function to control the button's disabled state
-        const updateButtonState = () => {
-            const isResultsVisible = !resultsContainer.classList.contains('hidden');
-            const isRiverMileFilled = riverMileInput.value.trim() !== '';
-            
-            // The button is disabled if a report has been generated or if not all conditions are met
-            const shouldBeDisabled = reportGenerated || !(isResultsVisible && isRiverMileFilled);
-            generateAndSaveBtn.disabled = shouldBeDisabled;
-            
-            // Change the button text based on the flag
-            if (reportGenerated) {
-                generateAndSaveBtn.textContent = 'Report Saved ✅';
-            } else {
-                generateAndSaveBtn.textContent = 'Generate & Save Report ✨';
-            }
-        };
-
-        // Event listener for the timer button
-        timerBtn.addEventListener('click', () => {
-             // Reset status message on timer interaction
-             statusMessage.textContent = '';
-            
-            if (timerInterval) {
-                // Stop the timer
-                clearInterval(timerInterval);
-                timerInterval = null;
-                const endTime = Date.now();
-                elapsedTime = (endTime - startTime) / 1000;
-                timeToDriftInput.value = elapsedTime.toFixed(2);
-                timeToDriftInput.readOnly = false;
-                timerBtn.textContent = 'Start Timer';
-                timerBtn.classList.remove('bg-red-600');
-                timerBtn.classList.add('bg-green-600');
-                timerStatus.textContent = '';
-                
-                // Calculate and populate the input fields
-                const velocityKnots = (100 / elapsedTime) * 0.592484;
-                const row = findClosestRow(velocityKnots, 'current');
-                if (row) {
-                    currentInput.value = row.current;
-                    angleInput.value = row.angle;
-                }
-                
-                updateTable();
-            } else {
-                // Start the timer
-                startTime = Date.now();
-                timeToDriftInput.readOnly = true;
-                timerStatus.textContent = ''; // Clear previous status
-                timerInterval = setInterval(() => {
-                    const currentTime = Date.now();
-                    const seconds = (currentTime - startTime) / 1000;
-                    
-                    // Automatically stop the timer at the point where the boom deflection angle is maximized
-                    if (seconds >= MAX_DRIFT_TIME) {
-                         clearInterval(timerInterval);
-                         timerInterval = null;
-                         timeToDriftInput.value = MAX_DRIFT_TIME.toFixed(2);
-                         timeToDriftInput.readOnly = false;
-                         timerBtn.textContent = 'Start Timer';
-                         timerBtn.classList.remove('bg-red-600');
-                         timerBtn.classList.add('bg-green-600');
-                         timerStatus.textContent = 'Max Angle Reached';
-
-                         const velocityKnots = (100 / MAX_DRIFT_TIME) * 0.592484;
-                         const row = findClosestRow(velocityKnots, 'current');
-                         if (row) {
-                             currentInput.value = row.current;
-                             angleInput.value = row.angle;
-                         }
-                         
-                         updateTable();
-                         return; // Exit the function to prevent further updates
-                    }
-
-                    const displaySeconds = seconds.toFixed(2);
-                    timeToDriftInput.value = displaySeconds;
-                }, 100); // Update every 100ms for a smoother timer
-                timerBtn.textContent = 'Stop Timer';
-                timerBtn.classList.remove('bg-green-600');
-                timerBtn.classList.add('bg-red-600');
-                statusMessage.textContent = ''; // Clear status message
-            }
-        });
-
-        // Event listener for the input fields
-        currentInput.addEventListener('input', () => {
-            angleInput.value = '';
-            timeToDriftInput.value = '';
-            if (timerInterval) {
-                clearInterval(timerInterval);
-                timerInterval = null;
-                timeToDriftInput.readOnly = false;
-                timerBtn.textContent = 'Start Timer';
-                timerBtn.classList.remove('bg-red-600');
-                timerBtn.classList.add('bg-green-600');
-                timerStatus.textContent = '';
-            }
-            
-            // New logic to populate Max Boom Angle when Current is entered
-            const current = parseFloat(currentInput.value);
-            if (!isNaN(current) && current > 0) {
-                const row = findClosestRow(current, 'current');
-                if (row) {
-                    angleInput.value = row.angle;
-                } else {
-                    angleInput.value = '';
-                }
-            } else {
-                angleInput.value = '';
-            }
-
-            updateTable();
-        });
-        angleInput.addEventListener('input', () => {
-            currentInput.value = '';
-            timeToDriftInput.value = '';
-            if (timerInterval) {
-                clearInterval(timerInterval);
-                timerInterval = null;
-                timeToDriftInput.readOnly = false;
-                timerBtn.textContent = 'Start Timer';
-                timerBtn.classList.remove('bg-red-600');
-                timerBtn.classList.add('bg-green-600');
-                timerStatus.textContent = '';
-            }
-            updateTable();
-        });
-        timeToDriftInput.addEventListener('input', () => {
-            // If the user manually enters a value, stop and reset the timer
-            if (timerInterval) {
-                clearInterval(timerInterval);
-                timerInterval = null;
-                timerBtn.textContent = 'Start Timer';
-                timerBtn.classList.remove('bg-red-600');
-                timerBtn.classList.add('bg-green-600');
-                timerStatus.textContent = '';
-            }
-            
-            const timeToDrift = parseFloat(timeToDriftInput.value);
-            if (!isNaN(timeToDrift) && timeToDrift > 0) {
-                // Calculation: Velocity (ft/s) = 100ft / time (s). 1 ft/s ≈ 0.592 knots.
-                const velocityKnots = (100 / timeToDrift) * 0.592484;
-                const row = findClosestRow(velocityKnots, 'current');
-                if (row) {
-                    currentInput.value = row.current;
-                    angleInput.value = row.angle;
-                } else {
-                    currentInput.value = '';
-                    angleInput.value = '';
-                }
-            } else {
-                currentInput.value = '';
-                angleInput.value = '';
-            }
-            
-            // Update the table based on the new input
-            updateTable();
-        });
-        riverWidthInput.addEventListener('input', updateTable);
-        riverMileInput.addEventListener('input', updateTable);
-
-        // Event listener for the clear button
-        clearBtn.addEventListener('click', () => {
+        // Function to clear all input fields and results
+        const clearAll = () => {
             currentInput.value = '';
             angleInput.value = '';
             timeToDriftInput.value = '';
             riverWidthInput.value = '';
             riverMileInput.value = '';
+            resultsContainer.classList.add('hidden');
+            cascadeBoomingContainer.classList.add('hidden');
             reportContainer.classList.add('hidden');
             statusMessage.textContent = '';
-            if (timerInterval) {
-                clearInterval(timerInterval);
-                timerInterval = null;
-            }
-            timeToDriftInput.readOnly = false;
-            timerBtn.textContent = 'Start Timer';
-            timerBtn.classList.remove('bg-red-600');
-            timerBtn.classList.add('bg-green-600');
-            timerStatus.textContent = '';
-            reportGenerated = false; // Reset the flag
+            reportGenerated = false;
+            updateButtonState();
+        };
+        
+        // Function to enable/disable the "Generate & Save" button
+        const updateButtonState = () => {
+            const hasCalculation = !resultsContainer.classList.contains('hidden');
+            generateAndSaveBtn.disabled = !hasCalculation || reportGenerated;
+        };
+
+        // Event listeners for input changes
+        currentInput.addEventListener('input', () => {
+            timeToDriftInput.value = '';
             updateTable();
         });
+        angleInput.addEventListener('input', () => {
+            timeToDriftInput.value = '';
+            updateTable();
+        });
+        timeToDriftInput.addEventListener('input', () => {
+            currentInput.value = '';
+            angleInput.value = '';
+            updateTable();
+        });
+        riverWidthInput.addEventListener('input', updateTable);
+        clearBtn.addEventListener('click', clearAll);
 
-        // Event listener for the generate report button
-        generateAndSaveBtn.addEventListener('click', generateAndSaveReport);
+        // Event listener for the "Generate & Save" button
+        generateAndSaveBtn.addEventListener('click', () => {
+            if (!reportGenerated) {
+                generateAndSaveReport();
+                reportGenerated = true;
+            }
+        });
+
+        // Timer functionality
+        const timerDisplay = document.getElementById('timer-display');
+        let timerIsRunning = false;
+
+        timerBtn.addEventListener('click', () => {
+            if (!timerIsRunning) {
+                // Start the timer
+                timerIsRunning = true;
+                startTime = Date.now();
+                timerDisplay.classList.remove('hidden');
+                timerStatus.textContent = 'Timer is running...';
+                timerBtn.textContent = 'Stop Timer';
+                timerBtn.classList.remove('bg-green-600', 'hover:bg-green-700');
+                timerBtn.classList.add('bg-red-600', 'hover:bg-red-700');
+                
+                timerInterval = setInterval(() => {
+                    elapsedTime = Date.now() - startTime;
+                    const seconds = Math.floor(elapsedTime / 1000);
+                    const milliseconds = Math.floor((elapsedTime % 1000) / 10);
+                    timerDisplay.textContent = `${seconds.toString().padStart(2, '0')}:${milliseconds.toString().padStart(2, '0')}`;
+                }, 10);
+                
+            } else {
+                // Stop the timer
+                timerIsRunning = false;
+                clearInterval(timerInterval);
+                timerInterval = null;
+                const finalSeconds = Math.floor(elapsedTime / 1000);
+                timeToDriftInput.value = finalSeconds;
+                timerStatus.textContent = `Final time: ${finalSeconds} seconds.`;
+                timerBtn.textContent = 'Start Timer';
+                timerBtn.classList.remove('bg-red-600', 'hover:bg-red-700');
+                timerBtn.classList.add('bg-green-600', 'hover:bg-green-700');
+
+                // Automatically run the calculation after the timer stops
+                currentInput.value = '';
+                angleInput.value = '';
+                updateTable();
+            }
+        });
         
-        // Initial button state check
+        // Initial state update
         updateButtonState();
+
     </script>
 </body>
 </html>
