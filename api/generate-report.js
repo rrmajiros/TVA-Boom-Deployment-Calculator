@@ -1,151 +1,153 @@
-// This function will be called by your front-end to generate and save a report.
-// It securely uses environment variables for your API keys.
+// This serverless function handles the API calls to Google AI and Airtable.
+// It receives data from the front-end calculator, generates a report using
+// the Gemini model, and saves the report to the Airtable database.
 
-// Load the fetch function for Node.js environments
-const fetch = require('node-fetch');
+// IMPORTANT: Set these environment variables in your Vercel project settings.
+// GOOGLE_API_KEY: Your Google AI API key.
+// AIRTABLE_API_KEY: Your Airtable API key.
+// AIRTABLE_BASE_ID: The ID of your Airtable base.
+// AIRTABLE_TABLE_ID: The ID of your Airtable table.
 
-// This is the main function that Vercel will run.
-module.exports = async (req, res) => {
-    // We only accept POST requests.
+const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY;
+const AIRTABLE_API_KEY = process.env.AIRTABLE_API_KEY;
+const AIRTABLE_BASE_ID = process.env.AIRTABLE_BASE_ID;
+const AIRTABLE_TABLE_ID = process.env.AIRTABLE_TABLE_ID;
+
+// Define the API URLs
+const GOOGLE_AI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent';
+const AIRTABLE_API_URL = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_TABLE_ID}`;
+
+// Helper function for exponential backoff
+const exponentialBackoff = async (func, maxRetries = 5, delay = 1000) => {
+    for (let i = 0; i < maxRetries; i++) {
+        try {
+            return await func();
+        } catch (error) {
+            if (i < maxRetries - 1) {
+                await new Promise(res => setTimeout(res, delay * (2 ** i)));
+            } else {
+                throw error;
+            }
+        }
+    }
+};
+
+// Vercel serverless function handler
+export default async function handler(req, res) {
     if (req.method !== 'POST') {
-        res.status(405).json({ message: 'Method Not Allowed' });
-        return;
+        return res.status(405).json({ message: 'Method Not Allowed' });
     }
 
     try {
-        // Parse the JSON data sent from the front-end.
-        const { current, angle, riverWidth, riverMile, calculatedBoomLength, tension, interval, driftTime, isCascade, segments, anchors, anchorDetailsText } = req.body;
-        
-        // Use environment variables for API keys and IDs.
-        const geminiApiKey = process.env.GEMINI_API_KEY;
-        const airtableApiKey = process.env.AIRTABLE_API_KEY;
-        const airtableBaseId = process.env.AIRTABLE_BASE_ID;
-        const airtableTableId = process.env.AIRTABLE_TABLE_ID;
-        
-        // Simple validation to ensure we have the necessary data
-        if (!airtableApiKey || !airtableBaseId || !airtableTableId || !geminiApiKey) {
-            return res.status(500).json({ error: 'Missing environment variables. Please check your Vercel settings.' });
-        }
+        const {
+            current,
+            angle,
+            riverWidth,
+            riverMile,
+            calculatedBoomLength,
+            tension,
+            interval,
+            driftTime,
+            isCascade,
+            segments,
+            anchors,
+            anchorDetailsText
+        } = req.body;
 
-        // Make the API calls.
-        const geminiApiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${geminiApiKey}`;
-        const airtableUrl = `https://api.airtable.com/v0/${airtableBaseId}/${airtableTableId}`;
-        
-        // Re-create the user query for the Gemini API call.
-        const userQuery = `Write a detailed operational plan for a deployment report using the following format and data:
-        
-        Deployment Report
-        Prepared for: TVA Emergency Management
-        Subject: Geographic Response Strategy for River Mile ${riverMile}
-        
-        Operational Plan:
-        
-        Location: River Mile ${riverMile}
-        River Width: ${riverWidth} feet
-        Drift Time: ${driftTime} seconds
-        Current: ${current} knots
-        Max Boom Deflection Angle: ${angle} degrees
-        Boom Required: ${calculatedBoomLength} feet
-        Estimated Tension: ${tension} pounds per 100 ft of boom profile
-        Recommended Anchor Interval: ${interval}
-        
-        ${anchorDetailsText} 
-        
-        ${isCascade ? `The deployment will utilize a cascade booming system with ${segments} segments.` : ''} The deployment will use a 22-pound Danforth anchor. Please ensure all measurements and values in the report are presented in imperial units (e.g., feet, knots, pounds). Do not include any mention of a diagram, sketch, or formal email headings like "Prepared For" or "Subject" in the report text itself.`;
-        
-        const systemPrompt = "You are an expert oil spill response specialist. Your task is to write the body of a detailed, professional, and concise deployment report based on the provided data. The body should describe the operational plan, highlight key safety considerations, and explain the physical principles at play. Do not mention that you are an AI or language model. Respond in a formal, informative tone. Do not use an emoji.";
-        
-        // This is the exponential backoff function from your original code.
-        const fetchWithBackoff = async (url, options, retries = 3, delay = 1000) => {
-            try {
-                const response = await fetch(url, options);
-                if (!response.ok) {
-                    if (response.status === 429 && retries > 0) {
-                        console.log(`Rate limit exceeded. Retrying in ${delay / 1000} seconds...`);
-                        await new Promise(resolve => setTimeout(resolve, delay));
-                        return fetchWithBackoff(url, options, retries - 1, delay * 2);
-                    }
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-                return response;
-            } catch (error) {
-                if (retries > 0) {
-                    console.log(`Fetch error. Retrying in ${delay / 1000} seconds...`);
-                    await new Promise(resolve => setTimeout(resolve, delay));
-                    return fetchWithBackoff(url, options, retries - 1, delay * 2);
-                }
-                throw error;
+        // Step 1: Generate report text using Google AI with search grounding.
+        const prompt = `
+            You are a subject matter expert on boom deployment for environmental response.
+            Your task is to generate a professional, concise, and easy-to-read report
+            on a geographic response strategy for a diesel fuel spill.
+
+            The report should be a single, well-structured paragraph that includes the following information:
+            - A professional salutation.
+            - A summary of the deployment conditions (river mile, current, river width, boom angle, drift time if available).
+            - The calculated boom length required and the estimated tension.
+            - The recommended anchor interval and total number of anchors.
+            - A clear recommendation on whether a single boom or a cascade booming system is required, and if so, how many segments.
+            - A professional closing.
+
+            Here are the details for the report:
+            - River Mile: ${riverMile || 'Not specified'}
+            - River Current: ${current} knots
+            - River Width: ${riverWidth} ft
+            - Boom Angle: ${angle} degrees
+            - Calculated Boom Length: ${calculatedBoomLength} ft
+            - Estimated Tension: ${tension} lbs
+            - Recommended Anchor Interval: ${interval}
+            - Drift Time (for 100ft): ${driftTime || 'Not measured'} seconds
+            - Is Cascade Booming System Recommended?: ${isCascade ? 'Yes' : 'No'}
+            - Total segments (if cascade): ${isCascade ? segments : 1}
+            - Total anchors required: ${anchors}
+            - Anchor details: ${anchorDetailsText}
+            - Spill Type: Diesel Fuel
+            - Location: Tennessee Valley Authority waterway
+        `;
+
+        const googleAiPayload = {
+            contents: [{ parts: [{ text: prompt }] }],
+            tools: [{ "google_search": {} }],
+            systemInstruction: {
+                parts: [{ text: "Act as an expert environmental response consultant. Provide a concise, single-paragraph report based on the provided data." }]
             }
         };
 
-        // Step 1: Generate the report text
-        const geminiResponse = await fetchWithBackoff(geminiApiUrl, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                contents: [{ parts: [{ text: userQuery }] }],
-                systemInstruction: {
-                    parts: [{ text: systemPrompt }]
-                },
-            })
+        const googleAiResponse = await exponentialBackoff(async () => {
+            return fetch(`${GOOGLE_AI_API_URL}?key=${GOOGLE_AI_API_KEY}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(googleAiPayload)
+            });
         });
 
-        const geminiResult = await geminiResponse.json();
-        const generatedText = geminiResult?.candidates?.[0]?.content?.parts?.[0]?.text || "Could not generate report. Please try again.";
+        const googleAiResult = await googleAiResponse.json();
+        const generatedText = googleAiResult.candidates?.[0]?.content?.parts?.[0]?.text;
 
-        // Convert values to the correct type for Airtable
-        const currentNum = parseFloat(current);
-        const boomLengthNum = parseFloat(calculatedBoomLength);
-        const angleNum = parseFloat(angle);
-        const anchorsNum = parseFloat(anchors);
-        const segmentsNum = parseFloat(segments);
-        const riverWidthNum = parseFloat(riverWidth);
-
-        // Correctly parse the interval to be a number for Airtable
-        let intervalValueForAirtable;
-        if (interval.includes('+')) {
-            intervalValueForAirtable = parseFloat(interval.replace('+', ''));
-        } else if (interval.includes('per')) {
-            intervalValueForAirtable = parseFloat(interval.split(' ')[0]);
-        } else {
-            intervalValueForAirtable = parseFloat(interval);
+        if (!generatedText) {
+            throw new Error('Failed to generate report text from Google AI.');
         }
 
-        // Step 2: Save the report to Airtable
+        // Step 2: Save the generated report to Airtable.
         const airtablePayload = {
             records: [{
                 fields: {
-                    'River Mile': riverMile || 'N/A',
-                    'Current': isNaN(currentNum) ? null : currentNum,
-                    'Boom Required (ft)': isNaN(boomLengthNum) ? null : boomLengthNum,
-                    'Angle': isNaN(angleNum) ? null : angleNum,
-                    'Tension': tension,
-                    'Anchors': isNaN(anchorsNum) ? null : anchorsNum,
-                    'Anchor Interval': isNaN(intervalValueForAirtable) ? null : intervalValueForAirtable,
-                    'River Width (ft)': isNaN(riverWidthNum) ? null : riverWidthNum,
-                    'Drift Time (sec)': driftTime,
-                    'Generated Report': generatedText,
-                    'Report Date': new Date().toISOString().split('T')[0],
-                    'Cascade System?': isCascade,
-                    'Segments': isCascade ? segmentsNum : null,
+                    "Report": generatedText,
+                    "Current": parseFloat(current),
+                    "Angle": parseFloat(angle),
+                    "River Width": parseFloat(riverWidth),
+                    "River Mile": riverMile,
+                    "Calculated Boom Length": parseFloat(calculatedBoomLength),
+                    "Tension": tension,
+                    "Anchor Interval": interval,
+                    "Drift Time": parseFloat(driftTime) || null,
+                    "Is Cascade": isCascade,
+                    "Segments": isCascade ? segments : 1,
+                    "Anchors": anchors,
                 }
             }]
         };
 
-        await fetchWithBackoff(airtableUrl, {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${airtableApiKey}`,
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(airtablePayload),
+        const airtableResponse = await exponentialBackoff(async () => {
+            return fetch(AIRTABLE_API_URL, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${AIRTABLE_API_KEY}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(airtablePayload)
+            });
         });
 
-        // Respond with success and the generated text.
-        res.status(200).json({ success: true, message: 'Report generated and saved!', reportText: generatedText });
+        if (!airtableResponse.ok) {
+            const errorText = await airtableResponse.text();
+            throw new Error(`Failed to save report to Airtable: ${airtableResponse.status} ${airtableResponse.statusText} - ${errorText}`);
+        }
+
+        res.status(200).json({ reportText: generatedText });
 
     } catch (error) {
-        console.error('API call failed:', error);
-        res.status(500).json({ message: 'Failed to generate or save the report.', error: error.message });
+        console.error('API Error:', error);
+        res.status(500).json({ message: 'An unexpected error occurred.', error: error.message });
     }
-};
+}
