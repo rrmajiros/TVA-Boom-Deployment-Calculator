@@ -1,0 +1,764 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TVA Boom Deployment Calculator</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Use Inter font -->
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-gray-200 p-4">
+
+    <!-- Main Application Container -->
+    <div class="max-w-4xl mx-auto my-10 bg-gray-800 p-8 md:p-12 rounded-2xl shadow-xl border border-gray-700">
+        <div class="text-center mb-10">
+            <h1 class="text-3xl sm:text-4xl font-extrabold text-white mb-2">TVA Boom Deployment Calculator</h1>
+            <p class="text-gray-400 max-w-2xl mx-auto">This tool is designed to calculate boom deployment parameters for **Diesel Fuel** spills based on river current, boom angle, and river width.</p>
+        </div>
+
+        <!-- Input Fields -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+            <div>
+                <label for="current" class="block text-gray-300 font-semibold mb-2">Current (knots)</label>
+                <input type="number" id="current" step="0.1" placeholder="e.g., 1.5"
+                       class="w-full bg-gray-700 text-white rounded-lg px-4 py-3 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-200">
+            </div>
+            <div>
+                <label for="angle" class="block text-gray-300 font-semibold mb-2">Max Boom Angle (&deg;)</label>
+                <input type="number" id="angle" step="1" placeholder="e.g., 30"
+                       class="w-full bg-gray-700 text-white rounded-lg px-4 py-3 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-200">
+            </div>
+            <div>
+                <label for="river-width" class="block text-gray-300 font-semibold mb-2">River Width (ft)</label>
+                <input type="number" id="river-width" step="1" placeholder="e.g., 500"
+                       class="w-full bg-gray-700 text-white rounded-lg px-4 py-3 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-200">
+            </div>
+            <div>
+                <label for="river-mile" class="block text-gray-300 font-semibold mb-2">River Mile</label>
+                <input type="text" id="river-mile" placeholder="e.g., RM 450.2"
+                       class="w-full bg-gray-700 text-white rounded-lg px-4 py-3 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-ring-blue-500 transition-all duration-200">
+            </div>
+        </div>
+
+        <!-- Time to Drift & Timer Section - Combined and responsive within a frame -->
+        <div class="bg-gray-700 p-6 rounded-lg shadow-inner mb-8">
+            <h2 class="text-xl font-bold text-white mb-4 text-center">Drift Time Measurement</h2>
+            <div class="flex flex-col md:flex-row items-start md:items-end justify-between md:space-x-8">
+                <div class="w-full md:w-1/2 mb-6 md:mb-0">
+                    <label for="time-to-drift" class="block text-gray-300 font-semibold mb-2">Time to Drift 100ft (seconds)</label>
+                    <input type="number" id="time-to-drift" step="1" placeholder="e.g., 12"
+                           class="w-full bg-gray-800 text-white rounded-lg px-4 py-3 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-200">
+                </div>
+                <div class="flex flex-col items-center justify-center space-y-4 w-full md:w-1/2">
+                    <div class="text-5xl font-mono text-white hidden" id="timer-display"></div>
+                    <p id="timer-status" class="text-sm text-gray-400 min-h-[1.5rem]"></p>
+                    <button id="timer-btn" class="w-full bg-green-600 text-white font-bold py-3 px-6 rounded-lg shadow-lg hover:bg-green-700 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-opacity-50">
+                        Start Timer
+                    </button>
+                </div>
+            </div>
+            <p class="mt-4 text-xs text-gray-400 text-center">To use the timer, drop a cork or small float 100 feet upstream from your location. Press start when you drop it and stop when it passes you.</p>
+        </div>
+        
+        <!-- Calculated Results Table -->
+        <div id="results-container" class="bg-gray-700 rounded-lg p-6 shadow-inner hidden">
+            <h2 class="text-2xl font-bold text-white mb-4 text-center">Calculated Results</h2>
+            <div class="overflow-x-auto">
+                <table class="min-w-full text-sm sm:text-base">
+                    <thead>
+                        <tr class="bg-gray-600 text-gray-200">
+                            <th class="px-4 py-3 text-left">Current (knots)</th>
+                            <th class="px-4 py-3 text-left">Max Boom Angle (&deg;)</th>
+                            <th class="px-4 py-3 text-left">Calculated Boom Length (ft)</th>
+                            <th class="px-4 py-3 text-left">Estimated Tension on Boom (lbs)</th>
+                            <th class="px-4 py-3 text-left">Recommended Anchor Interval</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr id="results-row" class="text-gray-300 border-b border-gray-600">
+                            <td id="output-current" class="px-4 py-4"></td>
+                            <td id="output-angle" class="px-4 py-4"></td>
+                            <td id="output-boom-required" class="px-4 py-4"></td>
+                            <td id="output-tension" class="px-4 py-4"></td>
+                            <td id="output-interval" class="px-4 py-4"></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        
+        <!-- Cascade Booming System Recommendation -->
+        <div id="cascade-booming-container" class="bg-gray-700 rounded-lg p-6 mt-8 shadow-inner hidden">
+            <h2 class="text-2xl font-bold text-white mb-4 text-center">Cascade Booming System Recommended</h2>
+            <p class="text-gray-300 mb-4">
+                Based on your specified conditions, a single continuous boom may experience excessive tension. A cascade booming system is recommended for this deployment to effectively contain oil and manage anchor loads.
+            </p>
+            <div id="cascade-details" class="text-gray-300 space-y-2">
+                <!-- Cascade details will be inserted here -->
+            </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="mt-8 flex flex-col md:flex-row-reverse md:justify-end gap-4">
+            <button id="generate-and-save-btn" disabled class="w-full md:w-auto bg-blue-600 text-white font-bold py-3 px-6 rounded-lg shadow-lg hover:bg-blue-700 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 disabled:bg-gray-500 disabled:cursor-not-allowed">
+                Generate & Save Report ✨
+            </button>
+            <a href="https://airtable.com/app1wD61zpd3QV4wJ/shr9eYi6ZdDTZFvNv" target="_blank" class="w-full md:w-auto text-gray-300 border border-blue-500 font-bold py-2 px-4 rounded-lg text-center hover:bg-blue-700 hover:text-white transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50">
+                View Past Reports
+            </a>
+            <button id="clear-btn" class="w-full md:w-auto text-gray-300 border border-gray-500 font-bold py-2 px-4 rounded-lg hover:bg-gray-700 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-opacity-50">
+                Clear
+            </button>
+        </div>
+
+        <!-- Note about data availability -->
+        <div class="mt-4 text-center text-xs text-gray-400">
+            Note: The data in the Airtable report is available for viewing and download for 24 hours.
+        </div>
+        
+        <!-- Status Message Container -->
+        <div id="status-message" class="mt-4 text-center text-sm font-semibold text-white"></div>
+
+
+        <!-- Generated Report Container -->
+        <div id="report-container" class="mt-8 hidden">
+            <div id="report-output" class="bg-gray-700 rounded-lg p-6 shadow-inner text-gray-300">
+                <!-- Report will be inserted here -->
+            </div>
+        </div>
+
+        <!-- Footnotes and Anchor Specifics Section -->
+        <div class="mt-12 text-gray-400 text-sm">
+            <p class="mb-4">This calculator is based on the <a href="https://rrt5.org/Documents/Habitat/InlandResponseTacticsManual2013.pdf" target="_blank" class="text-blue-400 hover:text-blue-300 underline">2013 EPA Inland Response Tactics Manual</a> and has been adapted for 8x12 river boom and 22 lb Danforth anchors by the Tennessee Valley Authority Environmental Response Team.</p>
+            <p class="font-bold text-gray-300 mb-2">Operational Factors</p>
+            <ul class="list-disc pl-5 space-y-2">
+                <li><strong class="text-white">River Current Speed:</strong> Faster currents require tighter spacing between boom segments to manage hydrodynamic pressure. A single long boom can be overwhelmed, leading to a "swamped" or "planing" effect where oil is pushed underneath. </li>
+                <li><strong class="text-white">Oil Entrainment:</strong> High currents can cause oil to be pulled under the boom, a process called entrainment. Cascades minimize this by allowing oil to be collected at multiple points before the current accelerates too much.</li>
+                <li><strong class="text-white">Boom Angle and Overlap:</strong> In faster currents, the boom angle must be smaller to the current to divert pollutants. Proper segment overlap (5 to 10 ft) is critical to prevent gaps and manage the strain on the system.</li>
+                <li><strong class="text-white">Hydrodynamic Pressure:</strong> By breaking a long boom into shorter segments, the cumulative force of the water is distributed, making deployment feasible in high-current situations. Some specialty booms even have vented skirts to reduce pressure.</li>
+                <li><strong class="text-white">Operational Strategy:</strong> Cascade systems can be used to create intentional gaps for vessel traffic, where the spacing is dictated by the vessel's needs and the potential for oil to escape.</li>
+            </ul>
+            <p class="font-bold text-gray-300 mt-6 mb-2">Anchor Specifics</p>
+            <p>This guide is based on the performance of a <strong class="text-white">22-pound Danforth anchor</strong>, a fluke-style anchor known for its high holding power relative to its weight. This anchor is particularly effective in a <strong class="text-white">sand or mud riverbed</strong>, where it is capable of achieving an approximate holding power of 1,600 pounds. Its holding power is significantly reduced in other types of riverbeds, such as rock, clay, or grass, which should be considered when adjusting anchor requirements in the field.</p>
+        </div>
+    </div>
+
+    <script>
+        // Get references to all necessary DOM elements
+        const currentInput = document.getElementById('current');
+        const angleInput = document.getElementById('angle');
+        const timeToDriftInput = document.getElementById('time-to-drift');
+        const riverWidthInput = document.getElementById('river-width');
+        const riverMileInput = document.getElementById('river-mile');
+        const resultsContainer = document.getElementById('results-container');
+        const outputCurrent = document.getElementById('output-current');
+        const outputAngle = document.getElementById('output-angle');
+        const outputBoomRequired = document.getElementById('output-boom-required');
+        const outputTension = document.getElementById('output-tension');
+        const outputInterval = document.getElementById('output-interval');
+        const cascadeBoomingContainer = document.getElementById('cascade-booming-container');
+        const cascadeDetails = document.getElementById('cascade-details');
+        const clearBtn = document.getElementById('clear-btn');
+        const generateAndSaveBtn = document.getElementById('generate-and-save-btn');
+        const reportContainer = document.getElementById('report-container');
+        const reportOutput = document.getElementById('report-output');
+        const statusMessage = document.getElementById('status-message');
+        const timerBtn = document.getElementById('timer-btn');
+        const timerStatus = document.getElementById('timer-status');
+
+        // Airtable credentials hardcoded from user input
+        const airtableApiKey = 'patmWaKdax71G1sOC.062f08550025caa66a227b9cdde640e68c5004dc5750828369ab1fd2d7a473d3';
+        const airtableBaseId = 'app1wD61zpd3QV4wJ';
+        const airtableTableId = 'tbl9XliFUZX9WRj7T';
+
+        // Timer variables
+        let timerInterval = null;
+        let startTime = 0;
+        let elapsedTime = 0;
+        
+        // This is the max time to drift corresponding to a 90-degree angle and 0.7 knot current
+        const MAX_DRIFT_TIME = 70;
+
+        // A flag to track if a report has already been generated
+        let reportGenerated = false;
+
+        // Main data structure based on the more granular table
+        const boomData = [
+            { current: 10.0, angle: 4.0, tension: '> 2,000', interval: '2+ per 50ft interval' },
+            { current: 7.5, angle: 5.4, tension: '> 2,000', interval: '2+ per 50ft interval' },
+            { current: 6.0, angle: 6.7, tension: '> 2,000', interval: '2+ per 50ft interval' },
+            { current: 5.0, angle: 8.0, tension: '~1,200 - 1,400', interval: '1 per 50ft interval' },
+            { current: 4.29, angle: 9.4, tension: '~1,200 - 1,400', interval: '1 per 50ft interval' },
+            { current: 3.53, angle: 11.4, tension: '~700 - 900', interval: '100' },
+            { current: 3.0, angle: 13.5, tension: '~700 - 900', interval: '100' },
+            { current: 2.5, angle: 16.3, tension: '~400 - 700', interval: '150' },
+            { current: 2.0, angle: 20.5, tension: '~220 - 400', interval: '200' },
+            { current: 1.5, angle: 27.8, tension: '~125 - 220', interval: '250' },
+            { current: 1.0, angle: 44.4, tension: '~100 - 275', interval: '300+' },
+            { current: 0.7, angle: 90.0, tension: '~100 - 275', interval: '300+' },
+        ];
+
+        // Function to find the correct row based on the closest value
+        const findClosestRow = (value, type) => {
+            if (isNaN(value)) return null;
+
+            let closestRow = null;
+            let minDifference = Infinity;
+
+            for (const row of boomData) {
+                const rowValue = row[type];
+                const difference = Math.abs(rowValue - value);
+
+                if (difference < minDifference) {
+                    minDifference = difference;
+                    closestRow = row;
+                }
+            }
+            return closestRow;
+        };
+        
+        // Function to update the results table with the given data row
+        const updateTable = () => {
+            const current = parseFloat(currentInput.value);
+            const angle = parseFloat(angleInput.value);
+            const timeToDrift = parseFloat(timeToDriftInput.value);
+            const riverWidth = parseFloat(riverWidthInput.value);
+
+            // Hide the containers by default
+            resultsContainer.classList.add('hidden');
+            cascadeBoomingContainer.classList.add('hidden');
+            updateButtonState();
+
+            // Check if all essential data is present for calculation
+            const hasCalculationValue = !isNaN(current) || !isNaN(angle) || !isNaN(timeToDrift);
+            const hasRiverWidth = !isNaN(riverWidth) && riverWidth > 0;
+            const isTimerRunning = timerInterval !== null;
+            const hasAllRequiredInputs = hasCalculationValue && hasRiverWidth && !isTimerRunning;
+            
+            if (!hasAllRequiredInputs) {
+                return;
+            }
+
+            let finalCurrent = null;
+            let row = null;
+            
+            // Prioritize the inputs based on user entry
+            if (!isNaN(current)) {
+                row = findClosestRow(current, 'current');
+                if (row) {
+                    finalCurrent = row.current;
+                }
+            } else if (!isNaN(angle)) {
+                row = findClosestRow(angle, 'angle');
+                if (row) {
+                    finalCurrent = row.current;
+                }
+            } else if (!isNaN(timeToDrift)) {
+                // Calculation: Velocity (ft/s) = 100ft / time (s). 1 ft/s ≈ 0.592 knots.
+                const velocityKnots = (100 / timeToDrift) * 0.592484;
+                finalCurrent = velocityKnots;
+                row = findClosestRow(finalCurrent, 'current');
+            }
+            
+            if (row && finalCurrent !== null) {
+                const calculatedBoomLength = Math.ceil((riverWidth / Math.sin(row.angle * Math.PI / 180)) / 50) * 50;
+                
+                outputCurrent.textContent = finalCurrent.toFixed(2);
+                outputAngle.textContent = row.angle;
+                outputBoomRequired.textContent = calculatedBoomLength;
+                outputTension.textContent = row.tension;
+                outputInterval.textContent = row.interval;
+                resultsContainer.classList.remove('hidden');
+                generateAndSaveBtn.classList.remove('hidden');
+                statusMessage.textContent = ''; // Clear any previous status message
+
+                // Check for cascade booming system
+                const boomLength = parseFloat(calculatedBoomLength);
+                if (finalCurrent > 1 && boomLength > riverWidth) {
+                    let numberOfSegments;
+                    let segmentLength;
+
+                    // New cascading boom logic based on current speed
+                    if (finalCurrent >= 1 && finalCurrent < 1.5) {
+                        numberOfSegments = 3;
+                    } else if (finalCurrent >= 1.5 && finalCurrent < 2) {
+                        numberOfSegments = 4;
+                    } else if (finalCurrent >= 2 && finalCurrent < 2.5) {
+                        numberOfSegments = 5;
+                    } else if (finalCurrent >= 2.5 && finalCurrent < 3) {
+                        numberOfSegments = 6;
+                    } else if (finalCurrent >= 3) {
+                        // Cap segment length at 300'
+                        numberOfSegments = Math.ceil(boomLength / 300);
+                    } else {
+                        // Fallback to a default
+                        numberOfSegments = Math.ceil(boomLength / riverWidth);
+                    }
+
+                    // Ensure segment lengths are in 50' increments
+                    segmentLength = Math.ceil(boomLength / numberOfSegments / 50) * 50;
+                    
+                    const intervalText = row.interval;
+                    let totalAnchors;
+                    let anchorsPerSegment;
+
+                    if (intervalText.includes('per')) {
+                        const anchorsPerInterval = parseFloat(intervalText.split(' ')[0]);
+                        const intermediateAnchors = Math.floor(boomLength / 50);
+                        totalAnchors = intermediateAnchors * anchorsPerInterval + 2;
+                        anchorsPerSegment = 'N/A'; // Not applicable for this calculation
+                    } else {
+                        const intervalValue = parseFloat(intervalText);
+                        anchorsPerSegment = Math.ceil(segmentLength / intervalValue) + 1;
+                        totalAnchors = anchorsPerSegment * numberOfSegments;
+                    }
+
+
+                    const overlap = 10; // A standard 10-foot overlap, based on best practices
+                    const spacing = segmentLength - overlap; // Distance between anchor points
+
+                    let detailsHtml = `<p class="font-semibold text-white">Segment Details:</p>
+                        <p class="text-xs italic text-gray-400">Segments are numbered from the most downstream moving upstream.</p>
+                        <ul class="list-disc list-inside space-y-1">`;
+                    
+                    for (let i = 1; i <= numberOfSegments; i++) {
+                        detailsHtml += `<li>Segment #${i}: <strong class="text-white">${segmentLength} ft</strong></li>`;
+                    }
+                   
+                    detailsHtml += `</ul>
+                        <p class="mt-4">Total number of anchors required: <strong class="text-white">${totalAnchors}</strong> (calculated for the entire boom length)</p>
+                        <p>Required overlap between segments: <strong class="text-white">${overlap} ft</strong></p>
+                        <p>Spacing between cascades: <strong class="text-white">${spacing} ft</strong></p>`;
+                    
+                    cascadeDetails.innerHTML = detailsHtml;
+                    cascadeBoomingContainer.classList.remove('hidden');
+                } else {
+                    cascadeBoomingContainer.classList.add('hidden');
+                }
+            } else {
+                resultsContainer.classList.add('hidden');
+                generateAndSaveBtn.classList.add('hidden');
+                cascadeBoomingContainer.classList.add('hidden');
+            }
+            updateButtonState();
+        };
+
+        // Asynchronous function to generate and save a report
+        const generateAndSaveReport = async () => {
+            // Get the calculated values from the table
+            const current = outputCurrent.textContent;
+            const angle = outputAngle.textContent;
+            const riverWidth = parseFloat(riverWidthInput.value) || 100;
+            const riverMile = riverMileInput.value;
+            const calculatedBoomLength = outputBoomRequired.textContent;
+            const tension = outputTension.textContent;
+            const interval = outputInterval.textContent;
+            const driftTime = timeToDriftInput.value;
+            
+            const boomLength = parseFloat(calculatedBoomLength);
+            const isCascade = !cascadeBoomingContainer.classList.contains('hidden');
+            
+            let segments = 1;
+            let anchors = 0;
+            let segmentLength = boomLength;
+            let anchorDetailsText = '';
+
+            if (isCascade) {
+                // Use the same logic as the display function to ensure consistency
+                if (current >= 1 && current < 1.5) {
+                    segments = 3;
+                } else if (current >= 1.5 && current < 2) {
+                    segments = 4;
+                } else if (current >= 2 && current < 2.5) {
+                    segments = 5;
+                } else if (current >= 2.5 && current < 3) {
+                    segments = 6;
+                } else if (current >= 3) {
+                    segments = Math.ceil(boomLength / 300);
+                } else {
+                    segments = Math.ceil(boomLength / riverWidth);
+                }
+                
+                segmentLength = Math.ceil(boomLength / segments / 50) * 50;
+                
+                 // Calculate total anchors based on the full boom length and anchor interval
+                if (interval.includes('per')) {
+                    const anchorsPerInterval = parseFloat(interval.split(' ')[0]);
+                    const intermediateAnchors = Math.floor(boomLength / 50);
+                    anchors = intermediateAnchors * anchorsPerInterval + 2;
+                    anchorDetailsText = `A total of ${anchors} anchors are required, with ${anchorsPerInterval} anchor(s) ganged together at each 50ft interval along the boom.`;
+                } else {
+                    const intervalValue = parseFloat(interval);
+                    const calculatedBoomLengthNum = parseFloat(calculatedBoomLength);
+                    const segmentLengthForAnchor = Math.ceil(calculatedBoomLengthNum / segments / 50) * 50;
+                    const anchorsPerSegment = Math.ceil(segmentLengthForAnchor / intervalValue) + 1;
+                    anchors = anchorsPerSegment * segments;
+                    anchorDetailsText = `A total of ${anchors} anchors are required. Each segment requires ${anchorsPerSegment} anchors based on the ${intervalValue} ft interval.`;
+                }
+                
+            } else {
+                const intervalText = outputInterval.textContent;
+                if (intervalText.includes('per')) {
+                    const anchorsPerInterval = parseFloat(intervalText.split(' ')[0]);
+                    anchors = Math.ceil(boomLength / 50) * anchorsPerInterval;
+                    anchorDetailsText = `A total of ${anchors} anchors are required, with ${anchorsPerInterval} anchor(s) ganged together at each 50ft interval along the boom.`;
+                } else {
+                    const intervalValue = parseFloat(intervalText);
+                    anchors = Math.ceil(boomLength / intervalValue) + 1;
+                    anchorDetailsText = `A total of ${anchors} anchors are required, placed at a recommended interval of ${intervalValue} feet.`;
+                }
+            }
+            
+            // Get today's date
+            const today = new Date();
+            const options = { year: 'numeric', month: 'long', day: 'numeric' };
+            const formattedDate = today.toLocaleDateString('en-US', options);
+
+            const reportTitle = `Geographic Response Strategy Report for River Mile ${riverMile || 'N/A'}`;
+
+            // Show loading state for both generation and saving
+            generateAndSaveBtn.textContent = 'Generating & Saving...';
+            generateAndSaveBtn.disabled = true;
+            reportContainer.classList.remove('hidden');
+            reportOutput.innerHTML = '<div class="mt-8 text-white text-center">...Thinking...</div>';
+            statusMessage.textContent = ''; // Clear any previous status message
+
+            const userQuery = `Write a detailed operational plan for a deployment report using the following format and data:
+            
+            Deployment Report
+            Prepared for: TVA Emergency Management
+            Subject: Geographic Response Strategy for River Mile ${riverMile}
+            
+            Operational Plan:
+            
+            Location: River Mile ${riverMile}
+            River Width: ${riverWidth} feet
+            Drift Time: ${driftTime} seconds
+            Current: ${current} knots
+            Max Boom Deflection Angle: ${angle} degrees
+            Boom Required: ${calculatedBoomLength} feet
+            Estimated Tension: ${tension} pounds per 100 ft of boom profile
+            Recommended Anchor Interval: ${interval}
+            
+            ${anchorDetailsText} 
+            
+            ${isCascade ? `The deployment will utilize a cascade booming system with ${segments} segments.` : ''} The deployment will use a 22-pound Danforth anchor. Please ensure all measurements and values in the report are presented in imperial units (e.g., feet, knots, pounds). Do not include any mention of a diagram, sketch, or formal email headings like "Prepared For" or "Subject" in the report text itself.`;
+            
+            const systemPrompt = "You are an expert oil spill response specialist. Your task is to write the body of a detailed, professional, and concise deployment report based on the provided data. The body should describe the operational plan, highlight key safety considerations, and explain the physical principles at play. Do not mention that you are an AI or language model. Respond in a formal, informative tone. Do not use an emoji.";
+            const apiKey = "";
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
+
+            // Make the API call with exponential backoff
+            const fetchWithBackoff = async (url, options, retries = 3, delay = 1000) => {
+                try {
+                    const response = await fetch(url, options);
+                    if (!response.ok) {
+                        if (response.status === 429 && retries > 0) {
+                            console.log(`Rate limit exceeded. Retrying in ${delay / 1000} seconds...`);
+                            await new Promise(resolve => setTimeout(resolve, delay));
+                            return fetchWithBackoff(url, options, retries - 1, delay * 2);
+                        }
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    return response;
+                } catch (error) {
+                    if (retries > 0) {
+                        console.log(`Fetch error. Retrying in ${delay / 1000} seconds...`);
+                        await new Promise(resolve => setTimeout(resolve, delay));
+                        return fetchWithBackoff(url, options, retries - 1, delay * 2);
+                    }
+                    throw error;
+                }
+            };
+
+            try {
+                // Step 1: Generate the report text
+                const response = await fetchWithBackoff(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        contents: [{ parts: [{ text: userQuery }] }],
+                        systemInstruction: {
+                            parts: [{ text: systemPrompt }]
+                        },
+                    })
+                });
+
+                const result = await response.json();
+                const generatedText = result?.candidates?.[0]?.content?.parts?.[0]?.text || "Could not generate report. Please try again.";
+                
+                // Add the new title to the generated text
+                reportOutput.innerHTML = `
+                    <div class="font-bold text-lg mb-4 text-white">${reportTitle}</div>
+                    <div class="whitespace-pre-wrap text-sm text-gray-300">${generatedText}</div>
+                `;
+
+                // Step 2: Save the report to Airtable with the specified fields
+                statusMessage.textContent = 'Saving report to Airtable...';
+                const airtableUrl = `https://api.airtable.com/v0/${airtableBaseId}/${airtableTableId}`;
+
+                // Convert all number-like values to a number type to prevent Airtable errors
+                const currentNum = parseFloat(current);
+                const boomLengthNum = parseFloat(calculatedBoomLength);
+                const angleNum = parseFloat(angle);
+                const anchorsNum = parseFloat(anchors);
+                const segmentsNum = parseFloat(segments);
+                const riverWidthNum = parseFloat(riverWidth);
+                const driftTimeStr = driftTime;
+
+                // Correctly parse the interval to be a number for Airtable
+                let intervalValueForAirtable;
+                if (interval.includes('+')) {
+                    intervalValueForAirtable = parseFloat(interval.replace('+', ''));
+                } else if (interval.includes('per')) {
+                    intervalValueForAirtable = parseFloat(interval.split(' ')[0]);
+                } else {
+                    intervalValueForAirtable = parseFloat(interval);
+                }
+
+                const airtablePayload = {
+                    records: [{
+                        fields: {
+                            'River Mile': riverMile || 'N/A',
+                            'Current': isNaN(currentNum) ? null : currentNum,
+                            'Boom Length': isNaN(boomLengthNum) ? null : boomLengthNum,
+                            'Angle': isNaN(angleNum) ? null : angleNum,
+                            'Anchors': isNaN(anchorsNum) ? null : anchorsNum,
+                            'Segments': isNaN(segmentsNum) ? null : segmentsNum,
+                            'Seg Length': isNaN(segmentLength) ? null : segmentLength,
+                            'Report': generatedText,
+                            'River Width': isNaN(riverWidthNum) ? null : riverWidthNum,
+                            'Drift Time': driftTimeStr,
+                            'Anchor Interval': isNaN(intervalValueForAirtable) ? null : intervalValueForAirtable
+                        }
+                    }]
+                };
+
+                console.log('Sending payload to Airtable:', airtablePayload);
+
+                const airtableResponse = await fetch(airtableUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${airtableApiKey}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(airtablePayload)
+                });
+                
+                if (airtableResponse.ok) {
+                    statusMessage.textContent = 'Report saved successfully to Airtable!';
+                    reportGenerated = true; // Set the flag to true on success
+                } else {
+                    const errorDetails = await airtableResponse.json();
+                    statusMessage.textContent = `Error saving report: ${airtableResponse.statusText}. Please check your Base ID and Table ID.`;
+                    console.error('Airtable save failed:', errorDetails);
+                }
+
+            } catch (error) {
+                console.error("API call failed:", error);
+                reportOutput.innerHTML = '<div class="mt-8 text-white text-center">Error generating report. Please check your network connection or try again later.</div>';
+                statusMessage.textContent = "Error saving report.";
+            } finally {
+                // Update button state based on the new flag
+                updateButtonState();
+            }
+        };
+
+        // Function to control the button's disabled state
+        const updateButtonState = () => {
+            const isResultsVisible = !resultsContainer.classList.contains('hidden');
+            const isRiverMileFilled = riverMileInput.value.trim() !== '';
+            
+            // The button is disabled if a report has been generated or if not all conditions are met
+            const shouldBeDisabled = reportGenerated || !(isResultsVisible && isRiverMileFilled);
+            generateAndSaveBtn.disabled = shouldBeDisabled;
+            
+            // Change the button text based on the flag
+            if (reportGenerated) {
+                generateAndSaveBtn.textContent = 'Report Saved ✅';
+            } else {
+                generateAndSaveBtn.textContent = 'Generate & Save Report ✨';
+            }
+        };
+
+        // Event listener for the timer button
+        timerBtn.addEventListener('click', () => {
+             // Reset status message on timer interaction
+             statusMessage.textContent = '';
+            
+            if (timerInterval) {
+                // Stop the timer
+                clearInterval(timerInterval);
+                timerInterval = null;
+                const endTime = Date.now();
+                elapsedTime = (endTime - startTime) / 1000;
+                timeToDriftInput.value = elapsedTime.toFixed(2);
+                timeToDriftInput.readOnly = false;
+                timerBtn.textContent = 'Start Timer';
+                timerBtn.classList.remove('bg-red-600');
+                timerBtn.classList.add('bg-green-600');
+                timerStatus.textContent = '';
+                
+                // Calculate and populate the input fields
+                const velocityKnots = (100 / elapsedTime) * 0.592484;
+                const row = findClosestRow(velocityKnots, 'current');
+                if (row) {
+                    currentInput.value = row.current;
+                    angleInput.value = row.angle;
+                }
+                
+                updateTable();
+            } else {
+                // Start the timer
+                startTime = Date.now();
+                timeToDriftInput.readOnly = true;
+                timerStatus.textContent = ''; // Clear previous status
+                timerInterval = setInterval(() => {
+                    const currentTime = Date.now();
+                    const seconds = (currentTime - startTime) / 1000;
+                    
+                    // Automatically stop the timer at the point where the boom deflection angle is maximized
+                    if (seconds >= MAX_DRIFT_TIME) {
+                         clearInterval(timerInterval);
+                         timerInterval = null;
+                         timeToDriftInput.value = MAX_DRIFT_TIME.toFixed(2);
+                         timeToDriftInput.readOnly = false;
+                         timerBtn.textContent = 'Start Timer';
+                         timerBtn.classList.remove('bg-red-600');
+                         timerBtn.classList.add('bg-green-600');
+                         timerStatus.textContent = 'Max Angle Reached';
+
+                         const velocityKnots = (100 / MAX_DRIFT_TIME) * 0.592484;
+                         const row = findClosestRow(velocityKnots, 'current');
+                         if (row) {
+                             currentInput.value = row.current;
+                             angleInput.value = row.angle;
+                         }
+                         
+                         updateTable();
+                         return; // Exit the function to prevent further updates
+                    }
+
+                    const displaySeconds = seconds.toFixed(2);
+                    timeToDriftInput.value = displaySeconds;
+                }, 100); // Update every 100ms for a smoother timer
+                timerBtn.textContent = 'Stop Timer';
+                timerBtn.classList.remove('bg-green-600');
+                timerBtn.classList.add('bg-red-600');
+                statusMessage.textContent = ''; // Clear status message
+            }
+        });
+
+        // Event listener for the input fields
+        currentInput.addEventListener('input', () => {
+            angleInput.value = '';
+            timeToDriftInput.value = '';
+            if (timerInterval) {
+                clearInterval(timerInterval);
+                timerInterval = null;
+                timeToDriftInput.readOnly = false;
+                timerBtn.textContent = 'Start Timer';
+                timerBtn.classList.remove('bg-red-600');
+                timerBtn.classList.add('bg-green-600');
+                timerStatus.textContent = '';
+            }
+            
+            // New logic to populate Max Boom Angle when Current is entered
+            const current = parseFloat(currentInput.value);
+            if (!isNaN(current) && current > 0) {
+                const row = findClosestRow(current, 'current');
+                if (row) {
+                    angleInput.value = row.angle;
+                } else {
+                    angleInput.value = '';
+                }
+            } else {
+                angleInput.value = '';
+            }
+
+            updateTable();
+        });
+        angleInput.addEventListener('input', () => {
+            currentInput.value = '';
+            timeToDriftInput.value = '';
+            if (timerInterval) {
+                clearInterval(timerInterval);
+                timerInterval = null;
+                timeToDriftInput.readOnly = false;
+                timerBtn.textContent = 'Start Timer';
+                timerBtn.classList.remove('bg-red-600');
+                timerBtn.classList.add('bg-green-600');
+                timerStatus.textContent = '';
+            }
+            updateTable();
+        });
+        timeToDriftInput.addEventListener('input', () => {
+            // If the user manually enters a value, stop and reset the timer
+            if (timerInterval) {
+                clearInterval(timerInterval);
+                timerInterval = null;
+                timerBtn.textContent = 'Start Timer';
+                timerBtn.classList.remove('bg-red-600');
+                timerBtn.classList.add('bg-green-600');
+                timerStatus.textContent = '';
+            }
+            
+            const timeToDrift = parseFloat(timeToDriftInput.value);
+            if (!isNaN(timeToDrift) && timeToDrift > 0) {
+                // Calculation: Velocity (ft/s) = 100ft / time (s). 1 ft/s ≈ 0.592 knots.
+                const velocityKnots = (100 / timeToDrift) * 0.592484;
+                const row = findClosestRow(velocityKnots, 'current');
+                if (row) {
+                    currentInput.value = row.current;
+                    angleInput.value = row.angle;
+                } else {
+                    currentInput.value = '';
+                    angleInput.value = '';
+                }
+            } else {
+                currentInput.value = '';
+                angleInput.value = '';
+            }
+            
+            // Update the table based on the new input
+            updateTable();
+        });
+        riverWidthInput.addEventListener('input', updateTable);
+        riverMileInput.addEventListener('input', updateTable);
+
+        // Event listener for the clear button
+        clearBtn.addEventListener('click', () => {
+            currentInput.value = '';
+            angleInput.value = '';
+            timeToDriftInput.value = '';
+            riverWidthInput.value = '';
+            riverMileInput.value = '';
+            reportContainer.classList.add('hidden');
+            statusMessage.textContent = '';
+            if (timerInterval) {
+                clearInterval(timerInterval);
+                timerInterval = null;
+            }
+            timeToDriftInput.readOnly = false;
+            timerBtn.textContent = 'Start Timer';
+            timerBtn.classList.remove('bg-red-600');
+            timerBtn.classList.add('bg-green-600');
+            timerStatus.textContent = '';
+            reportGenerated = false; // Reset the flag
+            updateTable();
+        });
+
+        // Event listener for the generate report button
+        generateAndSaveBtn.addEventListener('click', generateAndSaveReport);
+        
+        // Initial button state check
+        updateButtonState();
+    </script>
+</body>
+</html>
