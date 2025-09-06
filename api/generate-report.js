@@ -82,7 +82,7 @@ export default async function handler(req, res) {
             - Total anchors required: ${anchors}
             - Anchor details: ${anchorDetailsText}
             
-            - Location: TVA GRS Strategy for a specific river mile
+            - Location: Response strategy for a specific river mile
         `;
 
         const googleAiPayload = {
