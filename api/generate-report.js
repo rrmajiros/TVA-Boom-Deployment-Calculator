@@ -120,7 +120,7 @@ export default async function handler(req, res) {
                     "Boom Length": parseFloat(calculatedBoomLength),
                     "Seg Length": parseFloat(calculatedBoomLength / segments),
                     "Anchor Interval": parseInt(interval),
-                    "Drift Time": parseFloat(driftTime) || null,
+                    "Drift Time": parseFloat(driftTime) || 0,
                     
                     "Segments": isCascade ? segments : 1,
                     "Anchors": anchors,
