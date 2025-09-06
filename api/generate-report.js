@@ -118,10 +118,10 @@ export default async function handler(req, res) {
                     "River Width": parseFloat(riverWidth),
                     "River Mile": riverMile,
                     "Boom Length": parseFloat(calculatedBoomLength),
-                    "Tension": tension,
+                    
                     "Anchor Interval": interval,
                     "Drift Time": parseFloat(driftTime) || null,
-                    "Is Cascade": isCascade,
+                    
                     "Segments": isCascade ? segments : 1,
                     "Anchors": anchors,
                 }
