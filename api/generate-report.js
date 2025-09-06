@@ -7,6 +7,7 @@
 // AIRTABLE_API_KEY: Your Airtable API key.
 // AIRTABLE_BASE_ID: The ID of your Airtable base.
 // AIRTABLE_TABLE_ID: The ID of your Airtable table.
+// this is a line added to force vercel to update
 
 const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY;
 const AIRTABLE_API_KEY = process.env.AIRTABLE_API_KEY;
