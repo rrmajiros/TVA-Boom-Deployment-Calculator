@@ -94,7 +94,7 @@ export default async function handler(req, res) {
         };
 
         const googleAiResponse = await exponentialBackoff(async () => {
-            return fetch(`${GOOGLE_AI_API_URL}?key=${GOOGLE_AI_API_KEY}`, {
+            return fetch(`${GOOGLE_AI_API_URL}?key=${GOOGLE_API_KEY}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(googleAiPayload)
