@@ -1,5 +1,5 @@
 TVA Boom Deployment Calculator
-This is a web-based tool developed by the TVA Environmental Response Team to assist in calculating boom deployment parameters for containing diesel fuel spills on rivers. The calculator simplifies on-site assessments by providing immediate, data-driven recommendations.
+This is a web-based planning tool developed by TVA consultants to assist in calculating boom deployment parameters for containing No. 2 fuel oil spills on on inland rivers/lakes and is adapted for the anchor systems in use by the TVA Environmental Response Team, which differ from those described in the 2013 EPA Inland Response Tactics Manual. The calculator simplifies on-site assessments by providing immediate, data-driven recommendations.
 
 Key Features
 Flexible Inputs: Calculate deployment based on a measured Current, a specific Max Boom Angle, or a measured Time to Drift over a 100-foot distance.
@@ -10,7 +10,9 @@ Real-time Calculations: The tool instantly calculates the required boom length, 
 
 Dynamic Recommendations: Provides a recommendation for a Cascade Booming System when river currents are high, including details on the number of segments, segment length, and total anchors needed.
 
-Airtable Integration: Generates a professional operational report and automatically saves all deployment data to an Airtable database for record-keeping and analysis.
+Google AI Integration: Generates a professional operational report that summarizes the stratey and outlines the operating conditions a logistics.
+
+Airtable Integration: Automatically saves all deployment data to an Airtable database for advanced strategy development, record-keeping and analysis.
 
 Reference Data: All calculations are based on the 2013 EPA Inland Response Tactics Manual and are adapted for 8x12 river boom and 22 lb Danforth anchors.
 
