@@ -1,41 +1,41 @@
-TVA Boom Deployment Calculator
-This is a web-based planning tool developed by TVA consultants to assist in calculating boom deployment parameters for containing No. 2 fuel oil spills on on inland rivers/lakes and is adapted for the anchor systems in use by the TVA Environmental Response Team, which differ from those described in the 2013 EPA Inland Response Tactics Manual. The calculator simplifies on-site assessments by providing immediate, data-driven recommendations.
+### TVA Boom Deployment Calculator
 
-Key Features
-Flexible Inputs: Calculate deployment based on a measured Current, a specific Max Boom Angle, or a measured Time to Drift over a 100-foot distance.
+### Project Overview
 
-Integrated Stopwatch: Use the built-in timer to accurately measure drift time, which is then used to calculate the river's current.
+The **TVA Boom Deployment Calculator** is a web-based planning tool for the TVA Environmental Response Team. It's designed to simplify the process of calculating boom deployment parameters for containing **No. 2 fuel oil spills** on inland rivers and lakes. The tool provides immediate, data-driven recommendations, adapting the 2013 EPA Inland Response Tactics Manual for the specific anchor systems used by the TVA.
 
-Real-time Calculations: The tool instantly calculates the required boom length, estimated tension, and recommended anchor interval.
+---
 
-Dynamic Recommendations: Provides a recommendation for a Cascade Booming System when river currents are high, including details on the number of segments, segment length, and total anchors needed.
+### ✨ Key Features
 
-Google AI Integration: Generates a professional operational report that summarizes the stratey and outlines the operating conditions a logistics.
+* **Flexible Inputs**: The tool offers three primary methods for calculation:
+    * **Manual Input**: Enter a known **current** or a specific **max boom angle**.
+    * **Drift Time**: Measure the time it takes for a float to drift 100 feet. The calculator then uses this data to determine the river's current.
+* **Integrated Stopwatch**: A built-in timer allows for accurate on-site measurement of drift time.
+* **Real-time Calculations**: As you input data, the tool instantly calculates the required **boom length**, estimated **tension**, and recommended **anchor interval**.
+* **Dynamic Recommendations**: For high-current situations, the calculator provides a recommendation for a **Cascade Booming System**, including details on the number of segments, segment length, and total anchors needed.
+* **Data Persistence & Export**: Measurement data is temporarily saved to an Airtable database for **24 hours**, allowing for analysis and the option to export the data to a CSV file within that period.
+* **Google AI Integration**: The tool uses Google's Generative Language API to create a professional operational report that summarizes the strategy and outlines operating conditions and logistics.
+* **Airtable Integration**: All deployment data is automatically saved to an Airtable database, enabling advanced strategy development, record-keeping, and analysis.
+* **Reference Data**: All calculations are based on the **2013 EPA Inland Response Tactics Manual**, adapted for 8x12 river boom and 22 lb Danforth anchors.
 
-Airtable Integration: Automatically saves all deployment data to an Airtable database for advanced strategy development, record-keeping and analysis.
+---
 
-Reference Data: All calculations are based on the 2013 EPA Inland Response Tactics Manual and are adapted for 8x12 river boom and 22 lb Danforth anchors.
+### ⚙️ How to Use
 
-How to Use
-Open the index.html file in any modern web browser.
+1.  Open the `index.html` file in any modern web browser.
+2.  Input the **River Width** in feet.
+3.  Choose your preferred calculation method:
+    * **Option 1**: Enter a known Current or Max Boom Angle directly.
+    * **Option 2**: Use the built-in stopwatch to measure the drift time over a 100-foot distance.
+4.  The results will automatically display in the **"Calculated Results"** table.
+5.  To save the data, enter the **River Mile** and click the **"Generate & Save Report"** button. The report will appear on the screen and be saved to the connected Airtable base. **The saved data is available for 24 hours and can be exported to a CSV file from the Airtable base during this time.**
 
-Input the River Width (in feet).
+---
 
-Choose one of the following methods for the calculation:
+### 🛠️ Technology Stack
 
-Option 1: Manual Input: Enter a known Current or Max Boom Angle.
-
-Option 2: Use the Timer: Use the stopwatch to measure the time it takes for a float to drift 100 feet downstream. The calculated time will automatically populate the "Time to Drift" field.
-
-The results will be displayed automatically in the "Calculated Results" table.
-
-If you want to save the report, enter the River Mile and click the "Generate & Save Report" button. The report will appear on the screen and be saved to the connected Airtable base.
-
-Technology Stack
-Frontend: HTML, JavaScript, and Tailwind CSS.
-
-API Integration:
-
-Airtable API: For persistent data storage and reporting.
-
-Google's Generative Language API: For generating detailed operational report text.
+* **Frontend**: HTML, JavaScript, and Tailwind CSS.
+* **API Integration**:
+    * **Airtable API**: For persistent data storage and reporting.
+    * **Google's Generative Language API**: For generating detailed operational reports.
